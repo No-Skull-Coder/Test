@@ -273,7 +273,7 @@ const numGroups = heartImages.length;
 // Đặt file video tương ứng vào thư mục video/ với tên: "video/planet 1.mp4", "video/planet 2.mp4", ...
 const CLUSTER_VIDEOS = Array.from(
     { length: numGroups },
-    (_, i) => `videos/planet ${i+1}.mp4`
+    (_, i) => `planet ${i+1}.mp4`
 );
 const maxDensity = 15000;
 const minDensity = 4000;
