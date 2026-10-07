@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universe</title>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+            "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js",
+            "three/examples/jsm/loaders/FontLoader.js": "https://unpkg.com/three@0.152.2/examples/jsm/loaders/FontLoader.js",
+            "three/examples/jsm/geometries/TextGeometry.js": "https://unpkg.com/three@0.152.2/examples/jsm/geometries/TextGeometry.js"
+        }
+    }
+    </script>
+    <link rel="stylesheet" href="./styles/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script type="module" src="./scripts/script.js"></script>
+
+    <style>
+        /* Chữ trắng dùng chung */
+        .text-white {
+            color: white !important;
+        }
+
+        /* Thanh trạng thái loading nhạc, cố định giữa màn hình trên cùng */
+        .music-status {
+            display: flex;
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            z-index: 9999;
+            align-items: center;
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+
+        /* Vòng xoay loading */
+        .music-status .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #a259f7;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        /* Hiện cảnh báo xoay ngang khi ở chế độ portrait */
+        body.portrait-mode #landscape-warning {
+            display: flex;
+            opacity:1;
+        }
+
+        /* Hiệu ứng xoay vòng cho spinner loading */
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Khối chữ gợi ý "Touch" phía trên màn hình */
+        #text {
+            position: fixed;
+            top:5%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            z-index: 9999;
+            line-height: 40px;
+        }
+        
+        #text h3 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #fff;
+            position: relative;
+            text-shadow: 
+                0 0 5px #fff,
+                0 0 10px #ff80ff,
+                0 0 20px #ff80ff,
+                0 0 40px #e0b3ff;
+            transition: opacity 0.5s ease;
+        }
+        
+        /* Hiệu ứng lấp lánh */
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+                opacity: 1;
+            }
+            20%, 24%, 55% {
+                opacity: 0.9;
+            }
+        }
+
+        /* Hiệu ứng xuất hiện rồi biến mất */
+        @keyframes fadeInOut {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+        }
+
+        /* Icon mũi tên nhấp nháy bên dưới chữ gợi ý */
+        .arrow-icon {
+            font-size: 28px;
+            color: #ff6ec7;
+            margin-top: 12px;
+            display: inline-block;
+            animation: arrowBounce 1.6s infinite;
+            filter: drop-shadow(0 0 6px #ff6ec7);
+        }
+        
+        /* Ẩn khối chữ gợi ý sau khi người dùng đã chạm/click */
+        #text.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Hiệu ứng phát sáng chữ */
+        @keyframes glowPulse {
+            0%, 100% {
+                filter: drop-shadow(0 0 6px #d69eff);
+            }
+            50% {
+                filter: drop-shadow(0 0 14px #d69eff);
+            }
+        }
+
+        /* Hiệu ứng mũi tên */
+        @keyframes arrowBounce {
+            0%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            50% {
+                transform: translateY(10px);
+                opacity: 1;
+            }
+        }
+
+        /* =========== HIỆU ỨNG CHỚP SÁNG "XUYÊN KHÔNG" KHI BAY GIỮA CÁC HỐ ĐEN =========== */
+        #warp-flash {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            pointer-events: none;
+            background: radial-gradient(circle,
+                rgba(255,255,255,0.95) 0%,
+                rgba(214,158,255,0.5) 35%,
+                rgba(162,89,247,0) 70%);
+            opacity: 0;
+        }
+        .warp-flash-active {
+            animation: warpFlashAnim 0.7s ease-out;
+        }
+        @keyframes warpFlashAnim {
+            0%   { opacity: 0;   transform: scale(0.25); }
+            28%  { opacity: 0.9; transform: scale(1.5); }
+            100% { opacity: 0;   transform: scale(2.6); }
+        }
+
+        /* =========== VIDEO CỦA HỐ ĐEN (bấm vào 1 hố đen để xem, bấm ra ngoài để thoát) =========== */
+        #blackhole-video-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 45;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, rgba(28,20,58,0.55) 0%, rgba(0,0,0,0.9) 75%);
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        #blackhole-video-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #blackhole-video-box {
+            position: relative;
+            width: min(72vw, 780px);
+            max-height: 82vh;
+            aspect-ratio: 16 / 9;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #000;
+            border: 1.5px solid rgba(214, 158, 255, 0.45);
+            box-shadow:
+                0 0 55px rgba(162, 89, 247, 0.55),
+                0 0 18px rgba(255, 255, 255, 0.15),
+                inset 0 0 10px rgba(173, 216, 230, 0.2);
+            transform: scale(0.85);
+            transition: transform 0.5s cubic-bezier(.2,.8,.2,1);
+        }
+        #blackhole-video-overlay.open #blackhole-video-box {
+            transform: scale(1);
+        }
+        #blackhole-video-box video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        @media (max-width: 720px) {
+            #blackhole-video-box {
+                width: min(92vw, 92vw);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="text">
+        <h3>Touch</h3>
+        <i class="fa-solid fa-angles-down arrow-icon"></i>
+    </div>
+
+    <div id="music-loader" class="music-status">
+        <div class="spinner"></div>
+        <span>Loading...</span>
+    </div>
+
+    <!-- CANVAS THREE.JS chính, chứa toàn bộ cảnh vũ trụ 3D -->
+    <div id="container" ></div>
+    <!-- 4 ảnh nổi -->
+    <div id="container-img1"></div>
+    <div id="container-img2"></div>
+    <div id="container-img3"></div>
+    <div id="container-img4"></div>
+
+    <!-- Hiệu ứng chớp sáng khi camera "xuyên không" giữa các hố đen -->
+    <div id="warp-flash"></div>
+
+    <!-- Video của từng hố đen: hiện lên khi bấm trúng hố đen, bấm ra vùng nền tối để thoát -->
+    <div id="blackhole-video-overlay">
+        <div id="blackhole-video-box">
+            <video id="blackhole-video" muted loop playsinline disablePictureInPicture></video>
+        </div>
+    </div>
+
+    <!-- CẢNH BÁO XOAY NGANG MÀN HÌNH (khi điện thoại đang ở chế độ dọc) -->
+    <div id="landscape-warning">
+        <div class="warning-content">
+            <div class="rotate-icon"></div>
+            <h1>Dong's Planet</h1>
+            <p style="font-size: 2em;">Rotate your screen horizontally to enjoy the beauty</p>
+            <p style="font-size: 0.8em;">By Hải Đông</p>
+            <div class="stars-bg"></div>
+        </div>
+    </div>
+    
+    <div id="dark-overlay"></div>
+    <div id="info"></div>
+    
+    <!-- Config mặc định cho template -->
+    <script>
+        window.dataLove2Loveloom = {
+            "template": "galaxy",
+            "data": {}
+        };
+    </script>
+
+    <!-- Tự thu nhỏ và ẩn 4 ảnh nổi -->
+    <script>
+        setTimeout(() => {
+            const img1 = document.getElementById('container-img1');
+            const img2 = document.getElementById('container-img2');
+            const img3 = document.getElementById('container-img3');
+            const img4 = document.getElementById('container-img4');
+            
+            if (img1) {
+                img1.style.transform = 'scale(0.3)';
+                img1.style.opacity = '0';
+            }     
+            if (img2) { 
+                img2.style.transform = 'scale(0.3)';
+                img2.style.opacity = '0';
+            }        
+            if (img3) { 
+                img3.style.transform = 'scale(0.3)';
+                img3.style.opacity = '0';
+            }        
+            if (img4) { 
+                img4.style.transform = 'scale(0.3)';
+                img4.style.opacity = '0';
+            }        
+        }, 30000);   
+    
+        window.addEventListener('click', () => {
+            const hint = document.getElementById('text');
+            hint.classList.add('hidden');
+        });
+        
+        // =========== MODULE QUẢN LÝ ÂM THANH DUY NHẤT ===========
+        // Số lượng file music và record trong thư mục audio
+        const AUDIO_CONFIG = {
+            musicCount: 5,
+            recordCount: 0
+        };
+
+        const audioPlaylist = [
+            ...Array.from(
+               {length: AUDIO_CONFIG.musicCount},
+               (_, i) => `audio/musics/music ${i+1}.mp3`
+               ),
+            ...Array.from(
+               {length: AUDIO_CONFIG.recordCount},
+               (_, i) => `audio/records/record ${i+1}.mp3`
+               )
+        ];
+
+        // Quản lý phát audio
+        const musicManager = {
+            audio: null,
+            state: 'idle', // idle | loading | ready | playing | paused | error
+
+            // Khởi tạo
+            init() {
+                this.setState('loading');
+
+                if (!audioPlaylist.length) {
+                    this.setState('error');
+                    return;
+                }
+
+                const track = audioPlaylist[Math.floor(Math.random() * audioPlaylist.length)];
+                this.audio = new Audio(track);
+                this.audio.loop = true;
+                this.audio.addEventListener('error', () => this.setState('error'));
+
+                this.audio.play()
+                    .then(() => this.setState('playing'))
+                    .catch(() => {
+                        // Trình duyệt chặn autoplay
+                        this.setState('ready');
+                        document.addEventListener('click', () => this.play(), { once: true });
+                    });
+
+                window.addEventListener('pagehide', () => {
+                    if (this.audio) {
+                        this.audio.pause();
+                        this.audio.currentTime = 0;
+                    }
+                });
+            },
+
+            // Phát audio
+            play() {
+                if (!this.audio) return;
+                this.audio.play().then(() => this.setState('playing')).catch(() => {});
+            },
+
+            // Tạm dừng audio
+            pause() {
+                if (!this.audio) return;
+                this.audio.pause();
+                this.setState('paused');
+            },
+
+            // Bật và tắt audio
+            toggle() {
+                if (!this.audio) return;
+                this.audio.paused ? this.play() : this.pause();
+            },
+
+            // Cập nhật trạng thái và ẩn loader
+            setState(newState) {
+                this.state = newState;
+                if (newState !== 'loading') {
+                    const loader = document.getElementById('music-loader');
+                    if (loader) loader.style.display = 'none';
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.musicManager = musicManager;
+            musicManager.init();
+        });
+        
+    </script>
+    
+    <!-- =========== WEB PROTECTION =========== -->
+    <script>
+    (function () {
+        "use strict";
+        // 1. Chặn chuột phải
+        document.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+        });
+
+        // 2. Chặn kéo thả
+        document.addEventListener("dragstart", function (e) {
+            e.preventDefault();
+        });
+
+        // 3. Chặn chọn text
+        document.addEventListener("selectstart", function (e) {
+            e.preventDefault();
+        });
+ 
+        // 4. Chặn 1 số phím tắt
+        document.addEventListener("keydown", function (e) {
+
+            const key = e.key.toLowerCase();
+
+            // F12
+            if (e.key === "F12") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Ctrl + U
+            if (e.ctrlKey && key === "u") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Ctrl + Shift + I
+            if (e.ctrlKey && e.shiftKey && key === "i") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Ctrl + Shift + J
+           if (e.ctrlKey && e.shiftKey && key === "j") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Ctrl + Shift + C
+            if (e.ctrlKey && e.shiftKey && key === "c") {
+                e.preventDefault();
+                return false;
+            }
+ 
+            // Ctrl + Shift + S
+            if (e.ctrlKey && e.shiftKey && key === "s") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Mac: Cmd + Option + I
+            if (e.metaKey && e.altKey && key === "i") {
+                e.preventDefault();
+                return false;
+            }  
+
+            // Mac: Cmd + Option + J
+            if (e.metaKey && e.altKey && key === "j") {
+                e.preventDefault();
+                return false;
+            }
+
+            // Mac: Cmd + Option + C
+            if (e.metaKey && e.altKey && key === "c") {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // 5. Hạn chế copy
+        document.addEventListener("copy", function (e) {
+            e.preventDefault();
+        });
+
+
+
+        // 6. Hạn chế cut
+        document.addEventListener("cut", function (e) {
+            e.preventDefault();
+        });
+
+        // 7. Hạn chế paste
+        document.addEventListener("paste", function (e) {
+            e.preventDefault();
+        });
+
+        // 8. Phát hiện devtools = kích thước
+        function detectDevToolsSize() {
+
+            const widthDiff =
+                window.outerWidth - window.innerWidth;
+
+            const heightDiff =
+                window.outerHeight - window.innerHeight;
+
+            if (widthDiff > 160 || heightDiff > 160) {
+                showProtectionScreen();
+            }
+        }
+
+        // 9. Màn hình cảnh báo
+        let protectionTriggered = false;
+
+        function showProtectionScreen() {
+
+            if (protectionTriggered) return;
+
+            protectionTriggered = true;
+
+            document.body.innerHTML = `
+                <div style="
+                    position:fixed;
+                    inset:0;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    background:#000;
+                    color:#fff;
+                    font-family:Arial,sans-serif;
+                    text-align:center;
+                    z-index:999999999;
+                ">
+                    <div>
+                        <div style="font-size:60px;">🔒</div>
+                        <h1>Developer Tools bị phát hiện!</h1>
+                        <p>Vui lòng đóng Developer Tools lại để tiếp tục!</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 10. Check khi load
+        window.addEventListener(
+            "load",
+            detectDevToolsSize
+        );
+
+        // 11. Check khi resize
+        window.addEventListener(
+            "resize",
+            detectDevToolsSize
+        );
+ 
+        // 12. Check định kì
+        setInterval(
+            detectDevToolsSize,
+            1000
+        );
+        
+    })();
+    
+    </script>
+</body>
+</html>
