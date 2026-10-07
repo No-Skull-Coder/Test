@@ -272,7 +272,7 @@ const numGroups = heartImages.length;
 // Video riêng cho từng "hố đen" (cụm ảnh), theo đúng số lượng cụm hiện có.
 // Đặt file video tương ứng vào thư mục video/ với tên: "video/planet 1.mp4", "video/planet 2.mp4", ...
 const CLUSTER_VIDEOS = Array.from(
-    { length: numGroups },
+    { length: 1 },
     (_, i) => `planet ${i+1}.mp4`
 );
 const maxDensity = 15000;
